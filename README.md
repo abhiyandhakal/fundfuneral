@@ -31,6 +31,11 @@ The uninstaller removes only the app and launchers, keeping your vault and backu
    dates and amounts. Balances recalculate from the records.
 4. Use an adjustment with an actual balance to reconcile forgotten transactions.
 
+The desktop transaction form remembers selections separately for each currency.
+Unfinished forms retain every field across closing and restarting. After saving,
+amount, fee, actual balance, time and description reset; type, accounts, category
+and an explicitly chosen date remain selected. An untouched date follows today.
+
 Money uses integer minor units with a supported bound of 9,000,000,000,000 minor
 units per amount and aggregate. Currency precision is 0–4 places. Expense and
 transfer fees are separate; transfers and adjustments never inflate income or

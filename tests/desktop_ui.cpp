@@ -55,6 +55,8 @@ int main(int argc, char **argv) {
           require(d->isVisible(),"Enter unexpectedly submitted the form");
           qobject_cast<QLineEdit *>(field(d,"Amount"))->setText(editing ? "400" : "380");
           qobject_cast<QLineEdit *>(field(d,"Transaction fee"))->setText("2");
+          qobject_cast<QLineEdit *>(field(d,"Description"))->setText("Saved description");
+          qobject_cast<QLineEdit *>(field(d,"Time (optional)"))->setText("12:30");
           date->setDate(QDate(2024,2,29));
           button(d,"Save transaction")->click();
           require(!d->isVisible(),"Save did not close dialog");
@@ -70,6 +72,43 @@ int main(int argc, char **argv) {
     require(e.query("balance",{"cash"}).toInteger()==59800,"Edited expense balance incorrect");
     Engine reopened(dir.path());
     require(reopened.query("balance",{"cash"}).toInteger()==59800,"Expense did not persist");
+    {
+      Window next(&reopened); next.show(); app.processEvents();
+      QTimer::singleShot(0, [&] {
+        auto *d = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        try {
+          require(d, "No restored form");
+          require(qobject_cast<QComboBox *>(field(d,"Account"))->currentData()=="cash", "Account selection not retained");
+          require(qobject_cast<QComboBox *>(field(d,"Category"))->currentText()=="Food", "Category selection not retained");
+          require(qobject_cast<QLineEdit *>(field(d,"Amount"))->text().isEmpty(), "Saved amount reused");
+          require(qobject_cast<QLineEdit *>(field(d,"Transaction fee"))->text()=="0", "Saved fee reused");
+          require(qobject_cast<QLineEdit *>(field(d,"Description"))->text().isEmpty(), "Saved description reused");
+          require(qobject_cast<QLineEdit *>(field(d,"Time (optional)"))->text().isEmpty(), "Saved time reused");
+          require(qobject_cast<QDateEdit *>(field(d,"Date"))->date()==QDate(2024,2,29), "Selected date not retained");
+          qobject_cast<QLineEdit *>(field(d,"Amount"))->setText("12.34");
+          qobject_cast<QLineEdit *>(field(d,"Description"))->setText("Unfinished draft");
+          d->reject();
+        } catch(const std::exception &ex) { failure=ex.what(); if(d)d->reject(); }
+      });
+      button(&next,"+ Add transaction")->click();
+      require(failure.isEmpty(),qPrintable(failure));
+    }
+    {
+      Engine afterRestart(dir.path());
+      Window next(&afterRestart); next.show(); app.processEvents();
+      QTimer::singleShot(0, [&] {
+        auto *d = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        try {
+          require(d, "No draft dialog");
+          require(qobject_cast<QLineEdit *>(field(d,"Amount"))->text()=="12.34", "Draft amount lost after restart");
+          require(qobject_cast<QLineEdit *>(field(d,"Description"))->text()=="Unfinished draft", "Draft description lost after restart");
+          d->reject();
+        } catch(const std::exception &ex) { failure=ex.what(); if(d)d->reject(); }
+      });
+      button(&next,"+ Add transaction")->click();
+      require(failure.isEmpty(),qPrintable(failure));
+      require(afterRestart.query("rows",{"entry"}).toArray().size()==1,"Draft created a transaction");
+    }
     std::cout << "PASS: real transaction dialog date, type/dropdown changes, Enter, save, edit and persistence\n";
   } catch(const std::exception &ex) { std::cerr<<ex.what()<<'\n'; return 1; }
 }

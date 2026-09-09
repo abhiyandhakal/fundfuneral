@@ -1,0 +1,53 @@
+name: Build and verify
+on:
+  push:
+    branches: ['feat/**', 'fix/**', 'chore/**', master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-wayland libqt6sql6-sqlite openssl avahi-utils
+      - run: npm test
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2
+      - run: ctest --test-dir build --output-on-failure
+      - run: python3 tests/sync_transport.py
+      - run: python3 -m venv /tmp/fund-qa && /tmp/fund-qa/bin/pip install -r tests/requirements.txt && /tmp/fund-qa/bin/python tests/discovery.py
+      - run: python3 scripts/package-desktop.py
+      - run: bash tests/install.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist/*.tar.gz
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - run: npm ci --no-audit --no-fund
+        working-directory: mobile
+      - run: npm test -- --runInBand
+        working-directory: mobile
+      - run: ./gradlew --no-daemon --max-workers=2 assembleRelease
+        working-directory: mobile/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-unsigned-ci
+          path: mobile/android/app/build/outputs/apk/release/*unsigned.apk

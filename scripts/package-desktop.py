@@ -16,7 +16,7 @@ for category in ['platforms','platformthemes','wayland-shell-integration','wayla
 for path in (out/'plugins/sqldrivers').glob('*'):
     if 'sqlite' not in path.name:path.unlink()
 exclude=re.compile(r'^(ld-linux|libc\.|libm\.|libpthread\.|libdl\.|librt\.|libresolv\.|libnss_|libutil\.|libanl\.)')
-queue=[out/'bin/fund-funeral',*list((out/'plugins').rglob('*.so'))];seen=set()
+queue=[out/'bin/fund-funeral',pathlib.Path(shutil.which('openssl')),*list((out/'plugins').rglob('*.so'))];seen=set()
 while queue:
     file=queue.pop()
     result=subprocess.run(['ldd',str(file)],text=True,capture_output=True,check=False)
@@ -27,12 +27,14 @@ while queue:
         if exclude.match(name) or name in seen:continue
         seen.add(name);dest=out/'lib'/name;shutil.copy2(path,dest);queue.append(dest)
 shutil.copy2(root/'assets/icon.png',out/'share/fund-funeral.png')
+(out/'share/fonts.conf').write_text('''<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>/usr/share/fonts</dir><dir>/usr/local/share/fonts</dir><dir prefix="xdg">fonts</dir><dir>~/.fonts</dir><cachedir prefix="xdg">fund-funeral/fontconfig</cachedir><alias><family>sans-serif</family><prefer><family>Noto Sans</family><family>DejaVu Sans</family></prefer></alias><alias><family>monospace</family><prefer><family>Noto Sans Mono</family><family>DejaVu Sans Mono</family></prefer></alias></fontconfig>''')
 for name in ['install.sh','uninstall.sh']:shutil.copy2(root/'scripts'/name,out/name)
 for name in ['LICENSE','README.md','THIRD_PARTY.md']:shutil.copy2(root/name,out/name)
 (out/'AppRun').write_text('''#!/usr/bin/env sh
 set -eu
 app_dir=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
 export LD_LIBRARY_PATH="$app_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export FONTCONFIG_FILE="${FONTCONFIG_FILE:-$app_dir/share/fonts.conf}"
 export QT_PLUGIN_PATH="$app_dir/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$app_dir/plugins/platforms"
 exec "$app_dir/bin/fund-funeral" "$@"

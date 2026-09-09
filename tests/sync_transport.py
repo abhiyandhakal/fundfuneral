@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix='fund-sync-') as tmp:
     device=str(uuid.uuid4())
     def start(paired=False,vault_path=None):
         invite=tmp/'invite.json';invite.unlink(missing_ok=True)
-        p=subprocess.Popen([str(root/'build/fund-funeral'),'--data-dir',str(vault_path or tmp/'vault'),'--test-listen',str(invite)]+(['--paired-only'] if paired else []),env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        p=subprocess.Popen([os.environ.get('FUND_FUNERAL_BINARY',str(root/'build/fund-funeral')),'--data-dir',str(vault_path or tmp/'vault'),'--test-listen',str(invite)]+(['--paired-only'] if paired else []),env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         for _ in range(100):
             if invite.exists():return p,json.loads(invite.read_text())
             if p.poll() is not None:raise RuntimeError('Listener exited')

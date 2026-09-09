@@ -2,13 +2,14 @@
 """Run test-owned Android storage/TLS checks against a temporary desktop vault."""
 import json,os,pathlib,shlex,subprocess,tempfile,time,sys
 root=pathlib.Path(__file__).resolve().parents[1]
-serial=sys.argv[1] if len(sys.argv)>1 else '001481558003740'
+if len(sys.argv)!=2:raise SystemExit('Usage: test-android-native.py <adb-device-serial>')
+serial=sys.argv[1]
 adb=['adb','-s',serial]
 subprocess.run(adb+['install','-r',str(root/'dist/fund-funeral-1.0.0-android.apk')],check=True)
 subprocess.run(adb+['install','-r',str(root/'mobile/android/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk')],check=True)
 with tempfile.TemporaryDirectory(prefix='fund-android-native-') as tmp:
     path=pathlib.Path(tmp);invite=path/'invitation.json'
-    proc=subprocess.Popen([str(root/'build/fund-funeral'),'--data-dir',str(path/'vault'),'--test-listen',str(invite)],env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    proc=subprocess.Popen([os.environ.get('FUND_FUNERAL_BINARY',str(root/'build/fund-funeral')),'--data-dir',str(path/'vault'),'--test-listen',str(invite)],env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     try:
         for _ in range(100):
             if invite.exists():break

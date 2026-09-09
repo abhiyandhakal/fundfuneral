@@ -3,6 +3,7 @@
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
   app.setApplicationName("Fund Funeral");
+  app.setDesktopFileName("fund-funeral");
   app.setOrganizationName("FundFuneral");
   app.setApplicationVersion("1.0.0");
   try {

@@ -11,6 +11,8 @@ import {
   TextInput,
   View,
   ActivityIndicator,
+  StatusBar,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -478,6 +480,7 @@ function AppContent() {
     );
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
       <View style={styles.header}>
         <Image source={logo} style={styles.logo} resizeMode="contain" />
         <View style={{ flex: 1 }}>
@@ -870,11 +873,18 @@ function AppContent() {
           </Pressable>
         ))}
       </View>
-      <Modal visible={!!modal} animationType="slide" onRequestClose={close}>
+      <Modal
+        visible={!!modal}
+        animationType="slide"
+        onRequestClose={() => {
+          if (Keyboard.isVisible()) Keyboard.dismiss();
+          else close();
+        }}
+      >
         <SafeAreaView style={styles.root}>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <View style={styles.modalHeader}>
               <Text style={styles.h2}>

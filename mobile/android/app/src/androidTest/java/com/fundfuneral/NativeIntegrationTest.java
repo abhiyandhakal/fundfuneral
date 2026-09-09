@@ -112,6 +112,16 @@ public class NativeIntegrationTest {
       JSONObject i = new JSONObject(inviteText);
       String host = i.getString("host"), pin = i.getString("pin");
       int port = i.getInt("port");
+      if (!host.equals("10.0.2.2")) {
+        org.json.JSONArray services =
+            new org.json.JSONArray(invoke(p -> nativeApi.discover(p)));
+        boolean discovered = false;
+        for (int index = 0; index < services.length(); index++)
+          if (services.getJSONObject(index).getInt("port") == port)
+            discovered = true;
+        assertTrue("Android did not discover the desktop LAN service",
+                   discovered);
+      }
       JSONObject request = new JSONObject();
       request.put("action", "pair");
       request.put("device", device);

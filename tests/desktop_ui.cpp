@@ -84,9 +84,10 @@ int main(int argc, char **argv) {
           require(qobject_cast<QLineEdit *>(field(d,"Transaction fee"))->text()=="0", "Saved fee reused");
           require(qobject_cast<QLineEdit *>(field(d,"Description"))->text().isEmpty(), "Saved description reused");
           require(qobject_cast<QLineEdit *>(field(d,"Time (optional)"))->text().isEmpty(), "Saved time reused");
-          require(qobject_cast<QDateEdit *>(field(d,"Date"))->date()==QDate(2024,2,29), "Selected date not retained");
+          require(qobject_cast<QDateEdit *>(field(d,"Date"))->date()==QDate::currentDate(), "New form retained previous date");
           qobject_cast<QLineEdit *>(field(d,"Amount"))->setText("12.34");
           qobject_cast<QLineEdit *>(field(d,"Description"))->setText("Unfinished draft");
+          qobject_cast<QDateEdit *>(field(d,"Date"))->setDate(QDate(2020,1,1));
           d->reject();
         } catch(const std::exception &ex) { failure=ex.what(); if(d)d->reject(); }
       });
@@ -100,6 +101,7 @@ int main(int argc, char **argv) {
         auto *d = qobject_cast<QDialog *>(QApplication::activeModalWidget());
         try {
           require(d, "No draft dialog");
+          require(qobject_cast<QDateEdit *>(field(d,"Date"))->date()==QDate::currentDate(), "Draft restored an old date");
           require(qobject_cast<QLineEdit *>(field(d,"Amount"))->text()=="12.34", "Draft amount lost after restart");
           require(qobject_cast<QLineEdit *>(field(d,"Description"))->text()=="Unfinished draft", "Draft description lost after restart");
           d->reject();

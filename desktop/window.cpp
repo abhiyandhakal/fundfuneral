@@ -470,10 +470,6 @@ void Window::entryDialog(QJsonObject t) {
   auto *date = new QDateEdit(
       isNew ? QDate::currentDate()
                   : QDate::fromString(t["date"].toString(), Qt::ISODate));
-  if (isNew && draft.value("dateExplicit").toBool()) {
-    const auto savedDate = QDate::fromString(draft.value("date").toString(), Qt::ISODate);
-    if (savedDate.isValid()) date->setDate(savedDate);
-  }
   date->setCalendarPopup(true);
   date->setDisplayFormat("yyyy-MM-dd");
   f->addRow("Date", date);
@@ -490,14 +486,12 @@ void Window::entryDialog(QJsonObject t) {
   };
   connect(type, &QComboBox::currentTextChanged, &d, update);
   update();
-  bool dateExplicit = draft.value("dateExplicit").toBool();
   auto remember = [&] {
     if (!isNew) return;
     guarded([&] {
       const QJsonObject values{{"type", type->currentText()},
           {"account", account->currentData().toString()}, {"to", to->currentData().toString()},
-          {"category", category->currentText()}, {"date", date->date().toString(Qt::ISODate)},
-          {"dateExplicit", dateExplicit}, {"amount", amount->text()}, {"fee", fee->text()},
+          {"category", category->currentText()}, {"amount", amount->text()}, {"fee", fee->text()},
           {"actual", actual->text()}, {"time", time->text()}, {"description", description->text()}};
       e->setSetting(draftKey, QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact)));
     });
@@ -506,7 +500,6 @@ void Window::entryDialog(QJsonObject t) {
     connect(combo, &QComboBox::currentTextChanged, &d, remember);
   for (auto *input : {amount, fee, actual, time, description})
     connect(input, &QLineEdit::textChanged, &d, remember);
-  connect(date, &QDateEdit::dateChanged, &d, [&] { dateExplicit = true; remember(); });
   auto *save = button("Save transaction", f, [&] {
     guarded([&] {
       const QJsonValue precision = currentCurrency().value("digits");

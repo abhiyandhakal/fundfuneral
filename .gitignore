@@ -1,0 +1,12 @@
+build/
+dist/
+node_modules/
+.tools/
+*.user
+*.keystore
+*.jks
+local.properties
+.gradle/
+.cxx/
+*.log
+__pycache__/

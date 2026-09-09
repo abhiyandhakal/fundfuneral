@@ -418,13 +418,14 @@ void Window::entryDialog(QJsonObject t) {
     accountDialog();
     return;
   }
+  const bool isNew = t.isEmpty();
   QDialog d(this);
-  d.setWindowTitle(t.isEmpty() ? "Add transaction" : "Edit transaction");
+  d.setWindowTitle(isNew ? "Add transaction" : "Edit transaction");
   d.setMinimumWidth(460);
   auto *f = new QFormLayout(&d);
   auto *type = new QComboBox;
   type->addItems({"expense", "income", "transfer", "adjustment"});
-  if (!t.isEmpty())
+  if (!isNew)
     type->setCurrentText(t["type"].toString());
   f->addRow("Type", type);
   auto *account = new QComboBox, *to = new QComboBox;
@@ -435,15 +436,15 @@ void Window::entryDialog(QJsonObject t) {
       to->addItem(a["name"].toString(), a["id"].toString());
     }
   }
-  if (!t.isEmpty()) {
+  if (!isNew) {
     account->setCurrentIndex(account->findData(t["account"].toString()));
     to->setCurrentIndex(to->findData(t["to"].toString()));
   } else if (to->count() > 1)
     to->setCurrentIndex(1);
   f->addRow("Account", account);
   f->addRow("To account", to);
-  auto *amount = field(f, "Amount", t.isEmpty() ? "" : money(t["amount"])),
-       *fee = field(f, "Transaction fee", t.isEmpty() ? "0" : money(t["fee"]));
+  auto *amount = field(f, "Amount", isNew ? "" : money(t["amount"])),
+       *fee = field(f, "Transaction fee", isNew ? "0" : money(t["fee"]));
   auto *actual = field(f, "Actual balance (optional)");
   actual->setPlaceholderText("Calculate adjustment from current balance");
   auto *category = new QComboBox;
@@ -454,10 +455,10 @@ void Window::entryDialog(QJsonObject t) {
   for (int i = 1; i < categoryFilter->count(); i++)
     if (category->findText(categoryFilter->itemText(i)) < 0)
       category->addItem(categoryFilter->itemText(i));
-  category->setCurrentText(t["category"].toString());
+  category->setCurrentText(t.value("category").toString());
   f->addRow("Category", category);
   auto *date = new QDateEdit(
-      t.isEmpty() ? QDate::currentDate()
+      isNew ? QDate::currentDate()
                   : QDate::fromString(t["date"].toString(), Qt::ISODate));
   date->setCalendarPopup(true);
   date->setDisplayFormat("yyyy-MM-dd");
@@ -466,16 +467,18 @@ void Window::entryDialog(QJsonObject t) {
   time->setPlaceholderText("HH:MM, or leave blank");
   auto *description = field(f, "Description", t["description"].toString());
   auto update = [&] {
-    to->setEnabled(type->currentText() == "transfer");
+    f->setRowVisible(to, type->currentText() == "transfer");
     fee->setEnabled(type->currentText() == "expense" ||
                     type->currentText() == "transfer");
-    actual->setEnabled(type->currentText() == "adjustment" && t.isEmpty());
+    actual->setEnabled(type->currentText() == "adjustment" && isNew);
+    f->setRowVisible(actual, actual->isEnabled());
+    f->setRowVisible(fee, fee->isEnabled());
   };
   connect(type, &QComboBox::currentTextChanged, &d, update);
   update();
-  button("Save transaction", f, [&] {
+  auto *save = button("Save transaction", f, [&] {
     guarded([&] {
-      auto precision = currentCurrency()["digits"];
+      const QJsonValue precision = currentCurrency().value("digits");
       t["type"] = type->currentText();
       t["account"] = account->currentData().toString();
       t["to"] = type->currentText() == "transfer"
@@ -500,6 +503,8 @@ void Window::entryDialog(QJsonObject t) {
       d.accept();
     });
   });
+  save->setAutoDefault(false);
+  save->setDefault(false);
   d.exec();
 }
 void Window::exportCsv() {

@@ -17,4 +17,4 @@ fi
 cd "$root/mobile/android"
 ./gradlew --no-daemon --max-workers=1 assembleRelease "$@"
 mkdir -p "$root/dist"
-cp app/build/outputs/apk/release/app-release.apk "$root/dist/fund-funeral-1.0.1-android.apk"
+cp app/build/outputs/apk/release/app-release.apk "$root/dist/fund-funeral-1.0.2-android.apk"

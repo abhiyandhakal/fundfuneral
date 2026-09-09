@@ -394,12 +394,13 @@ void Window::accountDialog(QJsonObject a) {
     addCurrency();
     return;
   }
+  const bool isNew = a.isEmpty();
   QDialog d(this);
-  d.setWindowTitle(a.isEmpty() ? "Create account" : "Edit account");
+  d.setWindowTitle(isNew ? "Create account" : "Edit account");
   auto *f = new QFormLayout(&d);
-  auto *name = field(f, "Account name", a["name"].toString());
+  auto *name = field(f, "Account name", a.value("name").toString());
   auto *opening =
-      field(f, "Opening balance", a.isEmpty() ? "0" : money(a["opening"]));
+      field(f, "Opening balance", isNew ? "0" : money(a.value("opening")));
   f->addRow(new QLabel("Currency: " + currency->currentText()));
   button("Save account", f, [&] {
     guarded([&] {

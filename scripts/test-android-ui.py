@@ -11,7 +11,7 @@ def node(label):
  for n in nodes:
   if n.get('content-desc')==label:return n
  for n in nodes:
-  if n.get('text')==label:return n
+  if n.get('text','').casefold()==label.casefold():return n
  return None
 def tap(label,scroll=False):
  for _ in range(5 if scroll else 1):

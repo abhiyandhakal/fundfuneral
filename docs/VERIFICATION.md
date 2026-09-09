@@ -15,6 +15,9 @@ SQLite databases and preference namespaces; they never modify the user's vault.
 - Quoted/multiline CSV, duplicate preview, atomic imports, and 1,000-row import.
 - Complete backup/restore validation, filters and persistent dynamic categories.
 - React Native first-launch UI flow creates currency, account and expense with fee.
+- Signed APK touch tests on an Android API 36 emulator cover currency/account
+  creation, expense and fee balances, keyboard-safe forms, restart persistence,
+  editing and deletion. The captured screen is in `screenshots/android.png`.
 - Qt native self-test covers empty first launch, populated UI, SQLite reopening,
   preserved device identity and the actual QJSEngine domain runtime.
 

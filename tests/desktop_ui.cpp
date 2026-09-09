@@ -29,6 +29,37 @@ int main(int argc, char **argv) {
       e.mutate("account", {{"id",id},{"name",id},{"currency","npr"},{"opening",100000}});
     Window w(&e); w.show(); app.processEvents();
     QString failure;
+    // Exercise the real account dialog before setting up transaction forms.
+    auto accountForm = [&](bool editing) {
+      QTimer::singleShot(0, [&] {
+        auto *d = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        try {
+          require(d, "No account dialog");
+          auto *opening=qobject_cast<QLineEdit *>(field(d,"Opening balance"));
+          require(opening->text()==(editing ? "0.00" : "0"), "Incorrect account opening default");
+          qobject_cast<QLineEdit *>(field(d,"Account name"))->setText("Savings");
+          if(editing) opening->setText("125.50");
+          button(d,"Save account")->click();
+          require(!d->isVisible(),"Account save failed");
+        } catch(const std::exception &ex) { failure=ex.what(); if(d)d->reject(); }
+      });
+      button(&w,editing ? "Edit account" : "+ Add account")->click();
+      require(failure.isEmpty(),qPrintable(failure));
+    };
+    accountForm(false);
+    QString savings;
+    for(auto value:e.query("rows",{"account"}).toArray())
+      if(value.toObject().value("name")=="Savings") savings=value.toObject().value("id").toString();
+    require(!savings.isEmpty(),"New account not saved");
+    require(e.query("balance",{savings}).toInteger()==0,"New account is not zero balance");
+    auto *accountList=w.findChild<QListWidget *>();
+    for(int row=0;row<accountList->count();++row)
+      if(accountList->item(row)->data(Qt::UserRole)==savings) accountList->setCurrentRow(row);
+    accountForm(true);
+    {
+      Engine verifyAccount(dir.path());
+      require(verifyAccount.query("balance",{savings}).toInteger()==12550,"Edited account not persisted");
+    }
     auto run = [&](const QString &action, bool editing) {
       QTimer::singleShot(0, [&] {
         auto *d = qobject_cast<QDialog *>(QApplication::activeModalWidget());

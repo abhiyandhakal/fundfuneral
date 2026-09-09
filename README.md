@@ -12,9 +12,8 @@ The original Fund Funeral logo is reused with its gold palette.
 and an icon. Run `./AppRun` from the extracted folder for a portable launch.
 The bundle includes Qt and linked libraries but uses the system glibc, display
 server, graphics drivers and fonts. `openssl` is needed to create the device
-identity; `avahi-publish-service` enables automatic LAN discovery. On Debian or
-Ubuntu install `openssl avahi-utils`; on Arch install `openssl avahi`.
-Enable your distribution's Avahi service for discovery.
+identity. On Debian, Ubuntu or Arch install `openssl` if it is missing.
+LAN discovery runs inside the desktop app and does not require an Avahi daemon.
 
 **Android 7 or newer (ARM64 or x86_64):** download the release APK and open it on
 Android. Permit installation from the app used to open the APK when Android asks.
@@ -39,7 +38,7 @@ expense totals. Currencies are never combined using guessed exchange rates.
 
 ## Pair and sync
 
-Start with your existing data on the desktop and an empty phone vault. On the
+Keep your existing data on either device and start with an empty vault on the other. On the
 desktop choose **Devices → Pair new phone**. On the phone choose **Devices → Scan
 pairing QR**, scan the invitation, then tap **Pair with desktop**. An invitation
 is private, expires after five minutes, and can be used once. Pasting it also works.
@@ -51,8 +50,9 @@ is involved. The desktop listener closes after the exchange or five minutes.
 A desktop listener is the v1 transport role, not a canonical copy of the data.
 
 If discovery is blocked by a guest network or firewall, move both devices to a
-normal private LAN. The phone remembers the last endpoint, but dynamic listening
-ports mean a newly opened session normally needs working mDNS. Never expose the
+normal private LAN, or open a new pairing QR on the desktop and choose **Update
+connection QR** on the already-paired phone. This updates the endpoint while
+retaining the trusted identity. Never expose the
 listener through router port forwarding. Concurrent changes remain visible as
 conflicts; choose a version on either device, then sync again.
 
@@ -80,7 +80,7 @@ Android, since Android removes the app's private data when it is uninstalled.
 ## Develop and test
 
 Desktop dependencies: C++17 compiler, CMake, Qt 6.4+ Core/Widgets/Qml/Sql/Network,
-Qt's SQLite plugin, OpenSSL command and Avahi tools. Build with bounded parallelism:
+Qt's SQLite plugin and the OpenSSL command. Build with bounded parallelism:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

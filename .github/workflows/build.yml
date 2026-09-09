@@ -19,6 +19,7 @@ jobs:
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j2
       - run: ctest --test-dir build --output-on-failure
       - run: python3 tests/sync_transport.py
+      - run: python3 -m venv /tmp/fund-qa && /tmp/fund-qa/bin/pip install -r tests/requirements.txt && /tmp/fund-qa/bin/python tests/discovery.py
       - run: python3 scripts/package-desktop.py
       - run: bash tests/install.sh
       - uses: actions/upload-artifact@v4

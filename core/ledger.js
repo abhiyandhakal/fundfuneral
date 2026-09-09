@@ -6,8 +6,18 @@
     throw new Error(message);
   }
   function canonical(value) {
-    if(Array.isArray(value)) return "["+value.map(canonical).join(",")+"]";
-    if(value && typeof value === "object") return "{"+Object.keys(value).sort().map(function(k){return JSON.stringify(k)+":"+canonical(value[k]);}).join(",")+"}";
+    if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
+    if (value && typeof value === "object")
+      return (
+        "{" +
+        Object.keys(value)
+          .sort()
+          .map(function (k) {
+            return JSON.stringify(k) + ":" + canonical(value[k]);
+          })
+          .join(",") +
+        "}"
+      );
     return JSON.stringify(value);
   }
   function copy(value) {
@@ -65,7 +75,11 @@
     fail("A native cryptographically random UUID provider is required");
   }
   function validId(s) {
-    return typeof s === "string" && !["__proto__", "constructor", "prototype"].includes(s) && /^[a-zA-Z0-9_-]{1,100}$/.test(s);
+    return (
+      typeof s === "string" &&
+      !["__proto__", "constructor", "prototype"].includes(s) &&
+      /^[a-zA-Z0-9_-]{1,100}$/.test(s)
+    );
   }
   function name(s, label) {
     if (typeof s !== "string" || !s.trim() || s.length > 200)
@@ -227,8 +241,8 @@
         });
     });
   }
-  function mutate(s, kind, data, deleted, id) {
-    var n = copy(s),
+  function append(s, kind, data, deleted, id) {
+    var n = s,
       d = copy(data);
     validate(n, kind, d, !!deleted);
     var current = get(s, kind, d.id);
@@ -254,8 +268,65 @@
     n.events.push(e);
     n.clock = vector;
     index(n, e);
+    return n;
+  }
+  function appendWithCategory(s, kind, data, deleted, id) {
+    if (
+      kind === "entry" &&
+      !deleted &&
+      data.category &&
+      !rows(s, "category").some(function (c) {
+        return c.name.toLowerCase() === data.category.trim().toLowerCase();
+      })
+    ) {
+      append(
+        s,
+        "category",
+        { id: id + "-category", name: data.category.trim() },
+        false,
+        id + "-category-change"
+      );
+    }
+    return append(s, kind, data, deleted, id);
+  }
+  function mutate(s, kind, data, deleted, id) {
+    var n = appendWithCategory(copy(s), kind, data, deleted, id);
     check(n);
     return n;
+  }
+  function describe(s, event) {
+    var d = event.data,
+      prefix = event.deleted ? "Deleted · " : "";
+    if (event.kind === "entry") {
+      var a = get(s, "account", d.account),
+        c = a ? get(s, "currency", a.currency) : null;
+      return (
+        prefix +
+        d.type +
+        " · " +
+        (c ? c.code + " " + money(d.amount, c.digits) : String(d.amount)) +
+        "\n" +
+        (a ? a.name : "Account") +
+        (d.to ? " → " + (get(s, "account", d.to) || {}).name : "") +
+        "\n" +
+        d.date +
+        (d.time ? " " + d.time : "") +
+        "\n" +
+        (d.category || "") +
+        (d.description ? " · " + d.description : "") +
+        (d.fee && c ? "\nFee " + money(d.fee, c.digits) : "")
+      );
+    }
+    if (event.kind === "account") {
+      var c = get(s, "currency", d.currency);
+      return (
+        prefix +
+        d.name +
+        "\nOpening balance " +
+        (c ? c.code + " " + money(d.opening, c.digits) : String(d.opening))
+      );
+    }
+    return prefix + (d.name || d.code);
   }
   function merge(s, events) {
     if (!Array.isArray(events) || events.length > 100000)
@@ -606,12 +677,13 @@
     });
   }
   function importRows(s, previewRows, includeDuplicates, newId) {
-    var n = s;
+    var n = copy(s);
     previewRows.forEach(function (r) {
       if (r.error) fail("Fix invalid rows before importing");
       if (!r.duplicate || includeDuplicates)
-        n = mutate(n, "entry", r.entry, false, newId());
+        n = appendWithCategory(n, "entry", r.entry, false, newId());
     });
+    check(n);
     return n;
   }
   function backup(s) {
@@ -634,6 +706,7 @@
   }
   var api = {
     LIMIT: LIMIT,
+    describe: describe,
     parse: parse,
     money: money,
     today: today,

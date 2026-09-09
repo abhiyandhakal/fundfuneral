@@ -10,9 +10,9 @@ with tempfile.TemporaryDirectory(prefix='fund-sync-') as tmp:
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT);context.check_hostname=False;context.verify_mode=ssl.CERT_NONE;context.load_cert_chain(cert,key)
     context.minimum_version=context.maximum_version=ssl.TLSVersion.TLSv1_2
     device=str(uuid.uuid4())
-    def start(paired=False):
+    def start(paired=False,vault_path=None):
         invite=tmp/'invite.json';invite.unlink(missing_ok=True)
-        p=subprocess.Popen([str(root/'build/fund-funeral'),'--data-dir',str(tmp/'vault'),'--test-listen',str(invite)]+(['--paired-only'] if paired else []),env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        p=subprocess.Popen([str(root/'build/fund-funeral'),'--data-dir',str(vault_path or tmp/'vault'),'--test-listen',str(invite)]+(['--paired-only'] if paired else []),env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         for _ in range(100):
             if invite.exists():return p,json.loads(invite.read_text())
             if p.poll() is not None:raise RuntimeError('Listener exited')
@@ -43,5 +43,11 @@ with tempfile.TemporaryDirectory(prefix='fund-sync-') as tmp:
     p,i=start(True)
     try:
         request['device']=str(uuid.uuid4());check('error' in exchange(i,request),'Mismatched device accepted')
+    finally:p.terminate();p.wait(timeout=5)
+    p,i=start(vault_path=tmp/'empty-desktop')
+    try:
+        phone_vault=str(uuid.uuid4())
+        request={'action':'pair','secret':i['secret'],'device':device,'name':'Phone with records','vault':phone_vault,'clock':{device:1},'events':[event]}
+        response=exchange(i,request);check('error' not in response,'Phone-first pairing failed: '+str(response));check(response['vault']==phone_vault,'Desktop did not adopt phone vault');check(response['clock'][device]==1,'Phone records missing')
     finally:p.terminate();p.wait(timeout=5)
 print('PASS: real mutual TLS pairing, unauthorized rejection, delta commit, restart/retry, device identity binding')

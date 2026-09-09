@@ -82,6 +82,7 @@ android {
         applicationId "com.fundfuneral"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         versionCode 1
         versionName "1.0.0"
     }
@@ -101,6 +102,7 @@ android {
             keyPassword 'android'
         }
     }
+    testBuildType "release"
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -116,6 +118,8 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

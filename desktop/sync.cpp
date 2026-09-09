@@ -1,9 +1,15 @@
 #include "sync.h"
 SyncServer::SyncServer(Engine *e) : QTcpServer(e), engine(e) {
+  auto cleanEnvironment = QProcessEnvironment::systemEnvironment();
+  cleanEnvironment.remove("LD_LIBRARY_PATH");
+  cleanEnvironment.remove("QT_PLUGIN_PATH");
+  cleanEnvironment.remove("QT_QPA_PLATFORM_PLUGIN_PATH");
+
   auto certPath = e->directory + "/identity.pem",
        keyPath = e->directory + "/identity.key";
   if (!QFile::exists(certPath) || !QFile::exists(keyPath)) {
     QProcess p;
+    p.setProcessEnvironment(cleanEnvironment);
     p.start("openssl", {"req", "-x509", "-newkey", "rsa:2048", "-nodes",
                         "-keyout", keyPath, "-out", certPath, "-days", "3650",
                         "-subj", "/CN=Fund Funeral device"});
@@ -33,9 +39,8 @@ QString SyncServer::start(bool pairing) {
   secret = pairing ? Engine::uuid() + Engine::uuid() : QString();
   expiry.start(5 * 60 * 1000);
   QString name = QSysInfo::machineHostName() + " · Fund Funeral";
-  advertiser.start("avahi-publish-service",
-                   {name, "_fundfuneral._tcp", QString::number(serverPort()),
-                    "device=" + engine->state()["device"].toString()});
+  bool discovered =
+      discovery.start(engine->state()["device"].toString(), serverPort());
   QString host;
   for (auto address : QNetworkInterface::allAddresses())
     if (address.protocol() == QAbstractSocket::IPv4Protocol &&
@@ -50,11 +55,15 @@ QString SyncServer::start(bool pairing) {
                      {"pin", fingerprint()},
                      {"secret", secret},
                      {"vault", engine->state()["vault"]},
+                     {"empty", engine->state()["events"].toArray().isEmpty()},
                      {"name", name}};
   emit status(
       pairing
           ? "Ready to pair for 5 minutes. Enter the invitation on your phone."
           : "Ready for your phone to sync for 5 minutes.");
+  if (!discovered)
+    emit status("Sync is listening, but multicast discovery is unavailable. "
+                "Use a fresh QR invitation to update the phone endpoint.");
   return QString::fromUtf8(
       QJsonDocument(invite).toJson(QJsonDocument::Compact));
 }
@@ -62,10 +71,13 @@ void SyncServer::stop() {
   close();
   secret.clear();
   expiry.stop();
-  advertiser.terminate();
+  discovery.stop();
   for (auto *s : std::as_const(sockets))
     s->disconnectFromHost();
-  emit status("Sync listener stopped");
+  emit status(engine->setting("lastSync").isEmpty()
+                  ? "Sync listener stopped"
+                  : "Sync session closed. Last sync: " +
+                        engine->setting("lastSync"));
 }
 void SyncServer::incomingConnection(qintptr descriptor) {
   auto *s = new QSslSocket(this);
@@ -141,12 +153,26 @@ void SyncServer::process(QSslSocket *s, const QJsonObject &r,
   } else if (!peers.contains(pin) ||
              peers[pin].toObject()["device"] != r["device"])
     throw std::runtime_error("This device is not paired");
-  if (r["vault"] != engine->state()["vault"])
-    throw std::runtime_error("Wrong vault; pair again");
+  if (r["vault"] != engine->state()["vault"] &&
+      !(pairing && engine->state()["events"].toArray().isEmpty()))
+    throw std::runtime_error(
+        "Both devices have different vaults. Pair with an empty device.");
   if (pairing) {
     QString device = r["device"].toString();
     if (QUuid(device).isNull())
       throw std::runtime_error("Invalid device identity");
+    auto incoming = r["events"].toArray();
+    if (!incoming.isEmpty()) {
+      if (!engine->state()["events"].toArray().isEmpty())
+        throw std::runtime_error("Pairing cannot overwrite an existing vault");
+      if (QUuid(r["vault"].toString()).isNull())
+        throw std::runtime_error("Invalid vault identity");
+      auto base =
+          engine->call("initial", {engine->state()["device"], r["vault"]});
+      engine->save(engine->call("merge", {base, incoming}).toObject());
+      peers = QJsonObject();
+    } else if (r["vault"] != engine->state()["vault"])
+      throw std::runtime_error("Wrong vault");
     peers[pin] = QJsonObject{{"name", r["name"].toString().left(100)},
                              {"device", device}};
     engine->setSetting("peers", QString::fromUtf8(QJsonDocument(peers).toJson(

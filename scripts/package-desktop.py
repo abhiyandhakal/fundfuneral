@@ -6,6 +6,7 @@ version='1.0.0';out=root/'dist'/f'fund-funeral-{version}-linux-x86_64'
 if out.exists():shutil.rmtree(out)
 (out/'bin').mkdir(parents=True);(out/'lib').mkdir();(out/'plugins').mkdir();(out/'share').mkdir()
 shutil.copy2(root/'build/fund-funeral',out/'bin/fund-funeral')
+(out/'bin/qt.conf').write_text('[Paths]\nPrefix=..\nPlugins=plugins\nLibraries=lib\n')
 qt=shutil.which('qtpaths6') or shutil.which('qtpaths')
 plugin_dir=pathlib.Path(subprocess.check_output([qt,'--plugin-dir'],text=True).strip()) if qt else pathlib.Path(subprocess.check_output(['qmake6','-query','QT_INSTALL_PLUGINS'],text=True).strip())
 for category in ['platforms','platformthemes','wayland-shell-integration','wayland-decoration-client','wayland-graphics-integration-client','imageformats','iconengines','sqldrivers','tls','xcbglintegrations']:
@@ -27,7 +28,7 @@ while queue:
         seen.add(name);dest=out/'lib'/name;shutil.copy2(path,dest);queue.append(dest)
 shutil.copy2(root/'assets/icon.png',out/'share/fund-funeral.png')
 for name in ['install.sh','uninstall.sh']:shutil.copy2(root/'scripts'/name,out/name)
-for name in ['LICENSE','README.md']:shutil.copy2(root/name,out/name)
+for name in ['LICENSE','README.md','THIRD_PARTY.md']:shutil.copy2(root/name,out/name)
 (out/'AppRun').write_text('''#!/usr/bin/env sh
 set -eu
 app_dir=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)

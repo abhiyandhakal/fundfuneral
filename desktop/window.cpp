@@ -293,6 +293,8 @@ void Window::refresh() {
     categoryFilter->clear();
     categoryFilter->addItem("All categories", "");
     QSet<QString> cats;
+    for (auto v : e->query("rows", {"category"}).toArray())
+      cats.insert(v.toObject()["name"].toString());
     for (auto v : e->query("rows", {"entry"}).toArray()) {
       auto cat = v.toObject()["category"].toString();
       if (!cat.isEmpty())
@@ -506,18 +508,20 @@ void Window::exportCsv() {
                                              "fund-funeral.csv", "CSV (*.csv)");
     if (path.isEmpty())
       return;
-    writeFile(
-        path,
-        e->query("csvExport",
-                 {QJsonObject{
-                     {"currency", currentCurrency()["id"]},
-                     {"text", search->text()},
-                     {"account", accountFilter->currentData().toString()},
-                     {"type", typeFilter->currentData().toString()},
-                     {"category", categoryFilter->currentData().toString()},
-                     {"from", from->text()},
-                     {"until", until->text()}}})
-            .toString());
+    QJsonObject filter{{"currency", currentCurrency()["id"]},
+                       {"text", search->text()},
+                       {"account", accountFilter->currentData().toString()},
+                       {"type", typeFilter->currentData().toString()},
+                       {"category", categoryFilter->currentData().toString()},
+                       {"from", from->text()},
+                       {"until", until->text()}};
+    if (!minAmount->text().isEmpty())
+      filter["min"] =
+          e->call("parse", {minAmount->text(), currentCurrency()["digits"]});
+    if (!maxAmount->text().isEmpty())
+      filter["max"] =
+          e->call("parse", {maxAmount->text(), currentCurrency()["digits"]});
+    writeFile(path, e->query("csvExport", {filter}).toString());
     statusBar()->showMessage("CSV exported");
   });
 }
@@ -703,9 +707,7 @@ void Window::conflicts() {
           "Both devices changed this record. Select the version to keep."));
       for (auto version : conflict["versions"].toArray()) {
         auto event = version.toObject();
-        auto *label =
-            new QLabel(QString::fromUtf8(QJsonDocument(event["data"].toObject())
-                                             .toJson(QJsonDocument::Indented)));
+        auto *label = new QLabel(e->query("describe", {event}).toString());
         label->setWordWrap(true);
         l->addWidget(label);
         button(

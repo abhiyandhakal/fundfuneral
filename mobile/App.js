@@ -322,6 +322,7 @@ function AppContent() {
       'Salary',
       'Donation',
       'Other',
+      ...rows('category').map(e => e.name),
       ...rows('entry')
         .map(e => e.category)
         .filter(Boolean),
@@ -369,11 +370,12 @@ function AppContent() {
       let i = JSON.parse(invitation);
       if (i.format !== 'fund-funeral-pair' || i.version !== 1 || !i.secret)
         throw Error('Paste a current pairing invitation from the desktop');
-      if (ref.current.events.length)
+      if (ref.current.events.length && !i.empty)
         throw Error(
-          'Connect existing device requires an empty vault. Back up your current records first.',
+          'Both devices already have records. Pair with an empty device; independent vaults are not merged.',
         );
       const s = ref.current;
+      const targetVault = s.events.length ? s.vault : i.vault;
       let response = JSON.parse(
         await N.exchange(
           i.host,
@@ -384,14 +386,18 @@ function AppContent() {
             secret: i.secret,
             device: s.device,
             name: deviceName,
-            vault: i.vault,
-            clock: {},
+            vault: targetVault,
+            clock: s.events.length ? s.clock : {},
+            events: s.events.length ? s.events : [],
           }),
         ),
       );
       if (response.error) throw Error(response.error);
-      if (response.vault !== i.vault) throw Error('Wrong vault');
-      let next = L.merge(L.initial(s.device, i.vault), response.events);
+      if (response.vault !== targetVault) throw Error('Wrong vault');
+      let next = L.merge(
+        s.events.length ? s : L.initial(s.device, targetVault),
+        response.events,
+      );
       await save(next);
       let p = {
         host: i.host,
@@ -726,6 +732,27 @@ function AppContent() {
                 </Text>
                 <Button title="Sync now" disabled={busy} onPress={sync} />
                 <Button
+                  title="Update connection QR"
+                  secondary
+                  onPress={() =>
+                    run(async () => {
+                      const text = await N.scanQr();
+                      if (!text) return;
+                      const i = JSON.parse(text);
+                      if (
+                        i.format !== 'fund-funeral-pair' ||
+                        i.pin !== peer.pin ||
+                        i.vault !== ref.current.vault
+                      )
+                        throw Error('This is not your paired desktop');
+                      const updated = { ...peer, host: i.host, port: i.port };
+                      await N.setPeer(JSON.stringify(updated));
+                      setPeer(updated);
+                      setStatus('Connection updated. Tap Sync now.');
+                    })
+                  }
+                />
+                <Button
                   title="Forget this device"
                   secondary
                   onPress={() =>
@@ -752,9 +779,18 @@ function AppContent() {
                 <Text style={styles.h2}>Connect existing device</Text>
                 <Text style={styles.body}>
                   On your desktop, open Devices → Pair new phone. Paste its
-                  private invitation below. Pairing requires an empty vault.
+                  private invitation below. One device must have an empty vault.
                 </Text>
-                <Button title="Scan pairing QR" secondary onPress={()=>run(async()=>{const text=await N.scanQr();if(text)setInvitation(text);})}/>
+                <Button
+                  title="Scan pairing QR"
+                  secondary
+                  onPress={() =>
+                    run(async () => {
+                      const text = await N.scanQr();
+                      if (text) setInvitation(text);
+                    })
+                  }
+                />
                 <Input
                   label="Pairing invitation"
                   value={invitation}
@@ -785,7 +821,16 @@ function AppContent() {
                   if (!c) throw Error('Add a currency first');
                   await N.writeFile(
                     'fund-funeral.csv',
-                    L.csvExport(ref.current, { ...filter, currency: c.id }),
+                    L.csvExport(ref.current, {
+                      ...filter,
+                      currency: c.id,
+                      min: filter.minText
+                        ? L.parse(filter.minText, c.digits)
+                        : undefined,
+                      max: filter.maxText
+                        ? L.parse(filter.maxText, c.digits)
+                        : undefined,
+                    }),
                   );
                 })
               }
@@ -1128,7 +1173,7 @@ function AppContent() {
                       <View key={v.id} style={styles.card}>
                         <Text style={styles.body}>
                           {v.deleted ? 'Deleted record\n' : ''}
-                          {JSON.stringify(v.data, null, 2)}
+                          {L.describe(state, v)}
                         </Text>
                         <Button
                           title={

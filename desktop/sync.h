@@ -1,4 +1,5 @@
 #pragma once
+#include "discovery.h"
 #include "engine.h"
 #include <QtNetwork>
 class SyncServer : public QTcpServer {
@@ -20,7 +21,7 @@ private:
   QSslKey key;
   QString secret;
   QTimer expiry;
-  QProcess advertiser;
+  Discovery discovery;
   QSet<QSslSocket *> sockets;
   void process(QSslSocket *socket, const QJsonObject &request,
                const QString &pin);

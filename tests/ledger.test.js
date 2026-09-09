@@ -188,6 +188,52 @@ test("backup validation, restore and filters", () => {
   assert.equal(L.history(s, { type: "income" }).length, 0);
   assert.throws(() => L.restore('{"version":2}', "new", "vault"));
 });
-test('event retries are independent of JSON object key ordering',()=>{const s=setup();function reorder(v){if(Array.isArray(v))return v.map(reorder);if(v&&typeof v==='object')return Object.fromEntries(Object.keys(v).reverse().map(k=>[k,reorder(v[k])]));return v;}assert.deepEqual(L.merge(s,reorder(s.events)),s);});
-test('reserved object keys cannot become device identities',()=>{for(const name of ['__proto__','constructor','prototype'])assert.throws(()=>L.initial(name,'vault'));});
-test('three devices converge after independent offline additions and relaying',()=>{let a=setup(),b={...structuredClone(a),device:'phone'},c={...structuredClone(a),device:'third'};a=L.mutate(a,'entry',entry({amount:10}),false,id());b=L.mutate(b,'entry',entry({amount:20}),false,id());c=L.mutate(c,'entry',entry({amount:30}),false,id());b=L.merge(b,L.changes(a,b.clock));c=L.merge(c,L.changes(b,c.clock));a=L.merge(a,L.changes(c,a.clock));b=L.merge(b,L.changes(a,b.clock));assert.deepEqual(L.history(a),L.history(b));assert.deepEqual(L.history(b),L.history(c));});
+test("event retries are independent of JSON object key ordering", () => {
+  const s = setup();
+  function reorder(v) {
+    if (Array.isArray(v)) return v.map(reorder);
+    if (v && typeof v === "object")
+      return Object.fromEntries(
+        Object.keys(v)
+          .reverse()
+          .map((k) => [k, reorder(v[k])])
+      );
+    return v;
+  }
+  assert.deepEqual(L.merge(s, reorder(s.events)), s);
+});
+test("reserved object keys cannot become device identities", () => {
+  for (const name of ["__proto__", "constructor", "prototype"])
+    assert.throws(() => L.initial(name, "vault"));
+});
+test("three devices converge after independent offline additions and relaying", () => {
+  let a = setup(),
+    b = { ...structuredClone(a), device: "phone" },
+    c = { ...structuredClone(a), device: "third" };
+  a = L.mutate(a, "entry", entry({ amount: 10 }), false, id());
+  b = L.mutate(b, "entry", entry({ amount: 20 }), false, id());
+  c = L.mutate(c, "entry", entry({ amount: 30 }), false, id());
+  b = L.merge(b, L.changes(a, b.clock));
+  c = L.merge(c, L.changes(b, c.clock));
+  a = L.merge(a, L.changes(c, a.clock));
+  b = L.merge(b, L.changes(a, b.clock));
+  assert.deepEqual(L.history(a), L.history(b));
+  assert.deepEqual(L.history(b), L.history(c));
+});
+test("categories remain available after their last entry is deleted", () => {
+  let s = setup(),
+    e = entry({ category: "Research travel" });
+  s = L.mutate(s, "entry", e, false, id());
+  s = L.mutate(s, "entry", e, true, id());
+  assert.ok(L.rows(s, "category").some((c) => c.name === "Research travel"));
+});
+test("large CSV import commits all entries and preserves failed-input atomicity", () => {
+  const s = setup();
+  const text =
+    "date,amount\n" +
+    Array.from({ length: 1000 }, () => "2026-09-09,1").join("\n");
+  const p = L.preview(s, text, { date: "date", amount: "amount" }, "cash", id);
+  const next = L.importRows(s, p, true, id);
+  assert.equal(L.rows(next, "entry").length, 1000);
+  assert.equal(L.rows(s, "entry").length, 0);
+});

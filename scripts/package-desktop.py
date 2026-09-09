@@ -2,7 +2,7 @@
 """Bundle the executable, Qt plugins and their linked libraries (not glibc)."""
 import os,pathlib,re,shutil,subprocess,sys,tarfile
 root=pathlib.Path(__file__).resolve().parents[1]
-version='1.0.0';out=root/'dist'/f'fund-funeral-{version}-linux-x86_64'
+version='1.0.1';out=root/'dist'/f'fund-funeral-{version}-linux-x86_64'
 if out.exists():shutil.rmtree(out)
 (out/'bin').mkdir(parents=True);(out/'lib').mkdir();(out/'plugins').mkdir();(out/'share').mkdir()
 shutil.copy2(root/'build/fund-funeral',out/'bin/fund-funeral')

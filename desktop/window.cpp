@@ -418,14 +418,19 @@ void Window::entryDialog(QJsonObject t) {
     accountDialog();
     return;
   }
+  const bool isNew = t.isEmpty();
+  const QString draftKey = "transaction-form/" + currentCurrency().value("id").toString();
+  const auto draft = isNew
+      ? QJsonDocument::fromJson(e->setting(draftKey).toUtf8()).object()
+      : QJsonObject{};
   QDialog d(this);
-  d.setWindowTitle(t.isEmpty() ? "Add transaction" : "Edit transaction");
+  d.setWindowTitle(isNew ? "Add transaction" : "Edit transaction");
   d.setMinimumWidth(460);
   auto *f = new QFormLayout(&d);
   auto *type = new QComboBox;
   type->addItems({"expense", "income", "transfer", "adjustment"});
-  if (!t.isEmpty())
-    type->setCurrentText(t["type"].toString());
+  type->setCurrentText(isNew ? draft.value("type").toString("expense")
+                             : t.value("type").toString());
   f->addRow("Type", type);
   auto *account = new QComboBox, *to = new QComboBox;
   for (auto v : e->query("rows", {"account"}).toArray()) {
@@ -435,16 +440,22 @@ void Window::entryDialog(QJsonObject t) {
       to->addItem(a["name"].toString(), a["id"].toString());
     }
   }
-  if (!t.isEmpty()) {
+  if (!isNew) {
     account->setCurrentIndex(account->findData(t["account"].toString()));
     to->setCurrentIndex(to->findData(t["to"].toString()));
   } else if (to->count() > 1)
     to->setCurrentIndex(1);
+  if (isNew) {
+    for (auto pair : {qMakePair(account, QString("account")), qMakePair(to, QString("to"))}) {
+      const int index = pair.first->findData(draft.value(pair.second).toString());
+      if (index >= 0) pair.first->setCurrentIndex(index);
+    }
+  }
   f->addRow("Account", account);
   f->addRow("To account", to);
-  auto *amount = field(f, "Amount", t.isEmpty() ? "" : money(t["amount"])),
-       *fee = field(f, "Transaction fee", t.isEmpty() ? "0" : money(t["fee"]));
-  auto *actual = field(f, "Actual balance (optional)");
+  auto *amount = field(f, "Amount", isNew ? draft.value("amount").toString() : money(t["amount"])),
+       *fee = field(f, "Transaction fee", isNew ? draft.value("fee").toString("0") : money(t["fee"]));
+  auto *actual = field(f, "Actual balance (optional)", draft.value("actual").toString());
   actual->setPlaceholderText("Calculate adjustment from current balance");
   auto *category = new QComboBox;
   category->setEditable(true);
@@ -454,28 +465,44 @@ void Window::entryDialog(QJsonObject t) {
   for (int i = 1; i < categoryFilter->count(); i++)
     if (category->findText(categoryFilter->itemText(i)) < 0)
       category->addItem(categoryFilter->itemText(i));
-  category->setCurrentText(t["category"].toString());
+  category->setCurrentText((isNew ? draft : t).value("category").toString());
   f->addRow("Category", category);
   auto *date = new QDateEdit(
-      t.isEmpty() ? QDate::currentDate()
+      isNew ? QDate::currentDate()
                   : QDate::fromString(t["date"].toString(), Qt::ISODate));
   date->setCalendarPopup(true);
   date->setDisplayFormat("yyyy-MM-dd");
   f->addRow("Date", date);
-  auto *time = field(f, "Time (optional)", t["time"].toString());
+  auto *time = field(f, "Time (optional)", (isNew ? draft : t).value("time").toString());
   time->setPlaceholderText("HH:MM, or leave blank");
-  auto *description = field(f, "Description", t["description"].toString());
+  auto *description = field(f, "Description", (isNew ? draft : t).value("description").toString());
   auto update = [&] {
-    to->setEnabled(type->currentText() == "transfer");
+    f->setRowVisible(to, type->currentText() == "transfer");
     fee->setEnabled(type->currentText() == "expense" ||
                     type->currentText() == "transfer");
-    actual->setEnabled(type->currentText() == "adjustment" && t.isEmpty());
+    actual->setEnabled(type->currentText() == "adjustment" && isNew);
+    f->setRowVisible(actual, actual->isEnabled());
+    f->setRowVisible(fee, fee->isEnabled());
   };
   connect(type, &QComboBox::currentTextChanged, &d, update);
   update();
-  button("Save transaction", f, [&] {
+  auto remember = [&] {
+    if (!isNew) return;
     guarded([&] {
-      auto precision = currentCurrency()["digits"];
+      const QJsonObject values{{"type", type->currentText()},
+          {"account", account->currentData().toString()}, {"to", to->currentData().toString()},
+          {"category", category->currentText()}, {"amount", amount->text()}, {"fee", fee->text()},
+          {"actual", actual->text()}, {"time", time->text()}, {"description", description->text()}};
+      e->setSetting(draftKey, QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact)));
+    });
+  };
+  for (auto *combo : {type, account, to, category})
+    connect(combo, &QComboBox::currentTextChanged, &d, remember);
+  for (auto *input : {amount, fee, actual, time, description})
+    connect(input, &QLineEdit::textChanged, &d, remember);
+  auto *save = button("Save transaction", f, [&] {
+    guarded([&] {
+      const QJsonValue precision = currentCurrency().value("digits");
       t["type"] = type->currentText();
       t["account"] = account->currentData().toString();
       t["to"] = type->currentText() == "transfer"
@@ -497,9 +524,19 @@ void Window::entryDialog(QJsonObject t) {
                       : QJsonValue(time->text().trimmed());
       t["description"] = description->text();
       e->mutate("entry", t);
+      if (isNew) {
+        amount->clear();
+        fee->setText("0");
+        actual->clear();
+        time->clear();
+        description->clear();
+        remember();
+      }
       d.accept();
     });
   });
+  save->setAutoDefault(false);
+  save->setDefault(false);
   d.exec();
 }
 void Window::exportCsv() {

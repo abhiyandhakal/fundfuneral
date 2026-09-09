@@ -5,7 +5,7 @@ root=pathlib.Path(__file__).resolve().parents[1]
 if len(sys.argv)!=2:raise SystemExit('Usage: test-android-native.py <adb-device-serial>')
 serial=sys.argv[1]
 adb=['adb','-s',serial]
-subprocess.run(adb+['install','-r',str(root/'dist/fund-funeral-1.0.0-android.apk')],check=True)
+subprocess.run(adb+['install','-r',str(root/'dist/fund-funeral-1.0.1-android.apk')],check=True)
 subprocess.run(adb+['install','-r',str(root/'mobile/android/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk')],check=True)
 with tempfile.TemporaryDirectory(prefix='fund-android-native-') as tmp:
     path=pathlib.Path(tmp);invite=path/'invitation.json'

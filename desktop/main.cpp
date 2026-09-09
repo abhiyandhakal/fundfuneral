@@ -5,7 +5,7 @@ int main(int argc, char **argv) {
   app.setApplicationName("Fund Funeral");
   app.setDesktopFileName("fund-funeral");
   app.setOrganizationName("FundFuneral");
-  app.setApplicationVersion("1.0.0");
+  app.setApplicationVersion("1.0.1");
   try {
     if (app.arguments().contains("--self-test")) {
       QTemporaryDir dir;

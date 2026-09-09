@@ -6,7 +6,7 @@ trap 'rm -rf -- "$test_root"' EXIT
 export XDG_DATA_HOME="$test_root/data with spaces"
 export FUND_FUNERAL_BIN_DIR="$test_root/bin with spaces"
 export QT_QPA_PLATFORM=offscreen
-bundle="$root/dist/fund-funeral-1.0.0-linux-x86_64"
+bundle="$root/dist/fund-funeral-1.0.1-linux-x86_64"
 "$bundle/install.sh"
 "$FUND_FUNERAL_BIN_DIR/fund-funeral" --self-test
 "$bundle/install.sh"
